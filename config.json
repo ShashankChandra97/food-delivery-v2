@@ -1,0 +1,47 @@
+{
+  "mode": "demo",
+  "port": 8787,
+  "n8n_base_url": "http://localhost:5678",
+  "webhook_path": "food-delivery-serviceability-v2",
+  "policy_version": "classroom-2026-09-21",
+  "timestamp_window_seconds": 300,
+  "traffic_freshness_seconds": 300,
+  "historical_median_delay_minutes": 8,
+  "max_eta_minutes": 55,
+  "significant_delay_minutes": 10,
+  "delivery_window_buffer_minutes": 10,
+  "boundary_review_miles": 0.25,
+  "restaurant_timeout_minutes": 10,
+  "driver_timeout_minutes": 10,
+  "driver_location_timeout_minutes": 5,
+  "missing_order_alert_minutes": 1440,
+  "max_requests_per_minute": 60,
+  "region_alert_minimum_runs": 5,
+  "base_fee": 3.99,
+  "per_mile_fee": 0.95,
+  "per_route_minute_fee": 0.08,
+  "surge_multiplier": 1.0,
+  "shared_discount": 0.15,
+  "shared_max_detour_minutes": 10,
+  "map_timeout_seconds": 3,
+  "primary_provider": "google",
+  "backup_provider": "here",
+  "regions": [{
+    "id": "richardson-demo",
+    "name": "Richardson demo boundary",
+    "enabled": true,
+    "south": 32.90, "north": 33.05, "west": -96.85, "east": -96.65
+  }],
+  "restaurants": [{
+    "id": "REST-001", "name": "Demo Kitchen", "active": true,
+    "address": "800 W Campbell Rd, Richardson, TX",
+    "lat": 32.9857, "lng": -96.7502,
+    "preparation_minutes": 10
+  }],
+  "demo_addresses": {
+    "1200 E Campbell Rd, Richardson, TX": {"lat": 32.975, "lng": -96.71},
+    "1500 E Campbell Rd, Richardson, TX": {"lat": 32.976, "lng": -96.70},
+    "Demo Boundary, Richardson, TX": {"lat": 32.975, "lng": -96.6505},
+    "Demo Outside, Dallas, TX": {"lat": 32.80, "lng": -96.80}
+  }
+}

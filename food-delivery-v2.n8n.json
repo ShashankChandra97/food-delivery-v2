@@ -1,0 +1,1093 @@
+{
+  "id": "foodDeliverySpecV2",
+  "versionId": "63b386e8-e836-40db-9817-07887a102cfc",
+  "name": "Food Delivery v2 - Spec Pack and SQL Logging",
+  "nodes": [
+    {
+      "id": "67427aea-00b4-4e51-b306-bb78cb315a8f",
+      "name": "Food Delivery POST",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -680,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "food-delivery-serviceability-v2",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "food-delivery-v2"
+    },
+    {
+      "id": "6c0b5d50-9c53-4e9d-96df-ce17834b85b8",
+      "name": "Prepare Event Envelope",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -440,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const body = $json.body;\nif (!body || typeof body !== 'object' || Array.isArray(body)) return [{json:{payload:body ?? null}}];\nconst payload = {...body, event_type:body.event_type ?? 'order_placed', _execution_id:$execution.id};\nfor (const [source,target] of [['Customer_address','customer_address'],['Restaurant_id','restaurant_id'],['Order_timestamp','order_timestamp']]) { if (source in payload && !(target in payload)) {payload[target]=payload[source]; delete payload[source];} }\nreturn [{json:{payload}}];"
+      }
+    },
+    {
+      "id": "c21b20ce-04bb-44a7-bc1d-3aa1b6f3dbdc",
+      "name": "Normalize HTTP Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const r = $json;\nif (r.statusCode && r.body) return [{json:{code:r.statusCode, body:r.body}}];\nreturn [{json:{code:503,body:{status:'SERVICE_UNAVAILABLE', logging:{sql:false,n8n_execution:true}, message:'Local SQL service unreachable after retries. Start START.command and retry the SAME event_id.'}}}];"
+      }
+    },
+    {
+      "id": "66c174c8-a347-4fa0-bed6-9c776e0f0298",
+      "name": "Return Status and Decision",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        700,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.body }}",
+        "options": {
+          "responseCode": "={{ $json.code }}"
+        }
+      }
+    },
+    {
+      "id": "a48b13ad-20c7-4d9e-8855-57064d7b51f4",
+      "name": "Check Timeouts Every Minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -680,
+        1450
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "034a9ec9-2f81-4dc7-9bb6-58221e66880c",
+      "name": "Escalate Missing Events and Evaluate Alerts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -400,
+        1450
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8787/maintenance",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {
+          "timeout": 90000
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "bc2ad08b-9c7c-45d7-99a1-8f2dbb1feb96",
+      "name": "Flush Durable Loki Outbox",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -100,
+        1450
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8787/loki/flush",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "notesInFlow": true,
+      "notes": "No-op until LOKI_PUSH_URL is configured. Pending SQL outbox rows survive restarts; failures retry with backoff. Local SQL logging does not depend on Loki availability."
+    },
+    {
+      "id": "287a2c3c-4505-4fd2-8011-5767e642d2ed",
+      "name": "Nightly SQL Backup",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -680,
+        1730
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 2 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "761187f4-ae2f-41b5-905d-990f78d08131",
+      "name": "Create and Verify Recovery Snapshot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -400,
+        1730
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8787/backup",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {
+          "timeout": 90000
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "df7fe1ac-4d4e-413f-ad71-3da99b6556b2",
+      "name": "Implementation and Demo Scope",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -720,
+        -1460
+      ],
+      "parameters": {
+        "content": "## Food Delivery Spec Pack v2\nLocal demo: start START.command first. Import and publish this workflow.\nPOST /webhook/food-delivery-serviceability-v2\nControl page: http://localhost:8787\n\nSQLite support service owns atomic state, driver locks, routing decisions and persistent logs. n8n owns intake, retries, HTTP responses and scheduled supervision. Open each response decision_trace for all ten workbook steps.\n\nMap results are DEMO fixtures. Notifications are written to a LOCAL INBOX, not delivered to real customers. Live providers and Loki require setup. See SPEC_AUDIT.md for all eight sheets and explicit assumptions.",
+        "width": 1000,
+        "height": 320
+      }
+    },
+    {
+      "id": "3e1000fb-c9d2-4514-83d7-5f60b727083d",
+      "name": "1 Validate Address - Route - Quote - Log",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        100,
+        -880
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8787/events",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.payload }}",
+        "options": {
+          "timeout": 90000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 1000,
+      "onError": "continueRegularOutput",
+      "notesInFlow": true,
+      "notes": "Local SQLite transaction: event dedupe, active vendor lookup, geocoding, service boundary, traffic, safe alternatives, shared route, pricing, customer and restaurant gates, driver lock, SQL audit and notification inbox. Four map attempts then human review. Business 4xx responses are not retried."
+    },
+    {
+      "id": "1ccfbc3e-b708-4699-9468-795ce4ee8fbe",
+      "name": "2 Correct Address and Refresh Quote",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        100,
+        -680
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8787/events",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.payload }}",
+        "options": {
+          "timeout": 90000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 1000,
+      "onError": "continueRegularOutput",
+      "notesInFlow": true,
+      "notes": "Local SQLite transaction: event dedupe, active vendor lookup, geocoding, service boundary, traffic, safe alternatives, shared route, pricing, customer and restaurant gates, driver lock, SQL audit and notification inbox. Four map attempts then human review. Business 4xx responses are not retried."
+    },
+    {
+      "id": "9aaebded-2329-4945-bc6a-3a4947581342",
+      "name": "3 Confirm Option and Freeze Price",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        100,
+        -480
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8787/events",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.payload }}",
+        "options": {
+          "timeout": 90000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 1000,
+      "onError": "continueRegularOutput",
+      "notesInFlow": true,
+      "notes": "Local SQLite transaction: event dedupe, active vendor lookup, geocoding, service boundary, traffic, safe alternatives, shared route, pricing, customer and restaurant gates, driver lock, SQL audit and notification inbox. Four map attempts then human review. Business 4xx responses are not retried."
+    },
+    {
+      "id": "27dcfc32-c8d6-4811-8a99-2e802aa85053",
+      "name": "4 Restaurant Confirms Route Job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        100,
+        -280
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8787/events",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.payload }}",
+        "options": {
+          "timeout": 90000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 1000,
+      "onError": "continueRegularOutput",
+      "notesInFlow": true,
+      "notes": "Local SQLite transaction: event dedupe, active vendor lookup, geocoding, service boundary, traffic, safe alternatives, shared route, pricing, customer and restaurant gates, driver lock, SQL audit and notification inbox. Four map attempts then human review. Business 4xx responses are not retried."
+    },
+    {
+      "id": "219aa78d-b533-4713-8c42-9ce8df0ca279",
+      "name": "5 Lock Driver and Shared Capacity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        100,
+        -80
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8787/events",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.payload }}",
+        "options": {
+          "timeout": 90000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 1000,
+      "onError": "continueRegularOutput",
+      "notesInFlow": true,
+      "notes": "Local SQLite transaction: event dedupe, active vendor lookup, geocoding, service boundary, traffic, safe alternatives, shared route, pricing, customer and restaurant gates, driver lock, SQL audit and notification inbox. Four map attempts then human review. Business 4xx responses are not retried."
+    },
+    {
+      "id": "a6a615ef-7a35-47b1-8152-fb76fb7331d4",
+      "name": "6 Confirm Pickup and Start Delivery",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        100,
+        120
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8787/events",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.payload }}",
+        "options": {
+          "timeout": 90000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 1000,
+      "onError": "continueRegularOutput",
+      "notesInFlow": true,
+      "notes": "Local SQLite transaction: event dedupe, active vendor lookup, geocoding, service boundary, traffic, safe alternatives, shared route, pricing, customer and restaurant gates, driver lock, SQL audit and notification inbox. Four map attempts then human review. Business 4xx responses are not retried."
+    },
+    {
+      "id": "601f83d4-bd6f-4c14-9345-faf9b6ef8206",
+      "name": "7 Recheck Traffic Route ETA and Delay",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        100,
+        320
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8787/events",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.payload }}",
+        "options": {
+          "timeout": 90000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 1000,
+      "onError": "continueRegularOutput",
+      "notesInFlow": true,
+      "notes": "Local SQLite transaction: event dedupe, active vendor lookup, geocoding, service boundary, traffic, safe alternatives, shared route, pricing, customer and restaurant gates, driver lock, SQL audit and notification inbox. Four map attempts then human review. Business 4xx responses are not retried."
+    },
+    {
+      "id": "b4e27c40-33f3-44e5-8c11-ae6107162dc3",
+      "name": "8 Exclude Wrong Route and Recalculate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        100,
+        520
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8787/events",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.payload }}",
+        "options": {
+          "timeout": 90000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 1000,
+      "onError": "continueRegularOutput",
+      "notesInFlow": true,
+      "notes": "Local SQLite transaction: event dedupe, active vendor lookup, geocoding, service boundary, traffic, safe alternatives, shared route, pricing, customer and restaurant gates, driver lock, SQL audit and notification inbox. Four map attempts then human review. Business 4xx responses are not retried."
+    },
+    {
+      "id": "d77a83fa-2da8-49e9-a68b-ba5deb12a57e",
+      "name": "9 Verify Handoff and Mark Delivered",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        100,
+        720
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8787/events",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.payload }}",
+        "options": {
+          "timeout": 90000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 1000,
+      "onError": "continueRegularOutput",
+      "notesInFlow": true,
+      "notes": "Local SQLite transaction: event dedupe, active vendor lookup, geocoding, service boundary, traffic, safe alternatives, shared route, pricing, customer and restaurant gates, driver lock, SQL audit and notification inbox. Four map attempts then human review. Business 4xx responses are not retried."
+    },
+    {
+      "id": "e28b78e9-eacf-4253-b47f-17eb5f24c796",
+      "name": "10 Check Cancellation Policy",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        100,
+        920
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8787/events",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.payload }}",
+        "options": {
+          "timeout": 90000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 1000,
+      "onError": "continueRegularOutput",
+      "notesInFlow": true,
+      "notes": "Local SQLite transaction: event dedupe, active vendor lookup, geocoding, service boundary, traffic, safe alternatives, shared route, pricing, customer and restaurant gates, driver lock, SQL audit and notification inbox. Four map attempts then human review. Business 4xx responses are not retried."
+    },
+    {
+      "id": "97b25dcd-bf7f-40fe-8b57-366cf79f24f7",
+      "name": "Route Delivery Event",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -180,
+        0
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "renameOutput": true,
+              "outputKey": "order_placed",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "a65457ef-0ff7-4284-9fbb-8abb91cb8588",
+                    "leftValue": "={{ $json.payload?.event_type }}",
+                    "rightValue": "order_placed",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "address_updated",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "304da7e7-41e0-41ea-b54f-6d0e3446f339",
+                    "leftValue": "={{ $json.payload?.event_type }}",
+                    "rightValue": "address_updated",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "customer_confirmed",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "79c1a9c4-5b7c-4a65-9eb0-da7f056f4c77",
+                    "leftValue": "={{ $json.payload?.event_type }}",
+                    "rightValue": "customer_confirmed",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "restaurant_accepted",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "6aacf3fc-cf79-4268-9392-78ada468a294",
+                    "leftValue": "={{ $json.payload?.event_type }}",
+                    "rightValue": "restaurant_accepted",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "driver_accepted",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "f38516b0-e4f0-4839-ae27-c287f710fa84",
+                    "leftValue": "={{ $json.payload?.event_type }}",
+                    "rightValue": "driver_accepted",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "driver_picked_up",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "9b5095c2-337c-4268-8c23-e1a9c3066615",
+                    "leftValue": "={{ $json.payload?.event_type }}",
+                    "rightValue": "driver_picked_up",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "delivery_update",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "12c13373-e757-4843-a3a9-49cb8103f5c2",
+                    "leftValue": "={{ $json.payload?.event_type }}",
+                    "rightValue": "delivery_update",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "route_report",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "d55adf30-0ede-4fd2-a82b-78e20211c676",
+                    "leftValue": "={{ $json.payload?.event_type }}",
+                    "rightValue": "route_report",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "delivered",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "a181efe7-aed0-47ca-b4c7-fee8632cb3d7",
+                    "leftValue": "={{ $json.payload?.event_type }}",
+                    "rightValue": "delivered",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "cancelled",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "a960de51-569f-4b79-b8fd-f254d9573d7e",
+                    "leftValue": "={{ $json.payload?.event_type }}",
+                    "rightValue": "cancelled",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      }
+    },
+    {
+      "id": "dc82da0e-2087-410b-8917-a4497f030ee4",
+      "name": "Reject Unsupported Event and Save Audit",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        100,
+        1120
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8787/events",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.payload }}",
+        "options": {
+          "timeout": 90000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 1000,
+      "onError": "continueRegularOutput",
+      "notesInFlow": true,
+      "notes": "Local SQLite transaction: event dedupe, active vendor lookup, geocoding, service boundary, traffic, safe alternatives, shared route, pricing, customer and restaurant gates, driver lock, SQL audit and notification inbox. Four map attempts then human review. Business 4xx responses are not retried."
+    }
+  ],
+  "connections": {
+    "Food Delivery POST": {
+      "main": [
+        [
+          {
+            "node": "Prepare Event Envelope",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Delivery Event": {
+      "main": [
+        [
+          {
+            "node": "1 Validate Address - Route - Quote - Log",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "2 Correct Address and Refresh Quote",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "3 Confirm Option and Freeze Price",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "4 Restaurant Confirms Route Job",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "5 Lock Driver and Shared Capacity",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "6 Confirm Pickup and Start Delivery",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "7 Recheck Traffic Route ETA and Delay",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "8 Exclude Wrong Route and Recalculate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "9 Verify Handoff and Mark Delivered",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "10 Check Cancellation Policy",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject Unsupported Event and Save Audit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1 Validate Address - Route - Quote - Log": {
+      "main": [
+        [
+          {
+            "node": "Normalize HTTP Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2 Correct Address and Refresh Quote": {
+      "main": [
+        [
+          {
+            "node": "Normalize HTTP Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3 Confirm Option and Freeze Price": {
+      "main": [
+        [
+          {
+            "node": "Normalize HTTP Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4 Restaurant Confirms Route Job": {
+      "main": [
+        [
+          {
+            "node": "Normalize HTTP Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5 Lock Driver and Shared Capacity": {
+      "main": [
+        [
+          {
+            "node": "Normalize HTTP Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6 Confirm Pickup and Start Delivery": {
+      "main": [
+        [
+          {
+            "node": "Normalize HTTP Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "7 Recheck Traffic Route ETA and Delay": {
+      "main": [
+        [
+          {
+            "node": "Normalize HTTP Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "8 Exclude Wrong Route and Recalculate": {
+      "main": [
+        [
+          {
+            "node": "Normalize HTTP Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "9 Verify Handoff and Mark Delivered": {
+      "main": [
+        [
+          {
+            "node": "Normalize HTTP Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10 Check Cancellation Policy": {
+      "main": [
+        [
+          {
+            "node": "Normalize HTTP Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reject Unsupported Event and Save Audit": {
+      "main": [
+        [
+          {
+            "node": "Normalize HTTP Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Event Envelope": {
+      "main": [
+        [
+          {
+            "node": "Route Delivery Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize HTTP Response": {
+      "main": [
+        [
+          {
+            "node": "Return Status and Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Timeouts Every Minute": {
+      "main": [
+        [
+          {
+            "node": "Escalate Missing Events and Evaluate Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escalate Missing Events and Evaluate Alerts": {
+      "main": [
+        [
+          {
+            "node": "Flush Durable Loki Outbox",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nightly SQL Backup": {
+      "main": [
+        [
+          {
+            "node": "Create and Verify Recovery Snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "UTC",
+    "saveDataSuccessExecution": "all",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "errorWorkflow": "foodDeliveryV2Errors"
+  },
+  "pinData": {}
+}

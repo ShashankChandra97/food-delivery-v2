@@ -1,0 +1,60 @@
+{
+  "id": "foodDeliveryV2Errors",
+  "versionId": "4f4ef0c7-d827-4254-8648-dcb43e68c634",
+  "name": "Food Delivery v2 - Workflow Error Log",
+  "active": false,
+  "nodes": [
+    {
+      "id": "e1d54cf6-94d6-4cc8-b811-f5e839182413",
+      "name": "Workflow Failed",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "d91f244e-8e93-4aa4-8825-696cc8493c9d",
+      "name": "Persist Failure and Notify Local Dispatch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        300,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8787/workflow-errors",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {execution_id: $json.execution?.id || $json.trigger?.error?.timestamp || \"unknown\"} }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 1000
+    }
+  ],
+  "connections": {
+    "Workflow Failed": {
+      "main": [
+        [
+          {
+            "node": "Persist Failure and Notify Local Dispatch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  }
+}

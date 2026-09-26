@@ -1,0 +1,16 @@
+{
+  "result": "passed",
+  "workflow_status": "success",
+  "http_status": 200,
+  "state": "AWAITING_CUSTOMER",
+  "steps": 10,
+  "executed_nodes": [
+    "Manual Test",
+    "Sample Order",
+    "Prepare Event Envelope",
+    "Route Delivery Event",
+    "1 Validate Address - Route - Quote - Log",
+    "Normalize HTTP Response"
+  ],
+  "run_id": "77e9cc8d-77f2-4c01-b6f6-4b80b83c21bf"
+}

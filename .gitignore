@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+
+# Local runtime state and backups
+data/
+backups/
+last-request.json
+
+# Local environment and editor files
+.env
+.env.*
+.DS_Store
+.idea/
+.vscode/

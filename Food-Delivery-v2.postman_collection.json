@@ -1,0 +1,295 @@
+{
+  "info": {
+    "name": "Food Delivery v2",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5678/webhook/food-delivery-serviceability-v2"
+    },
+    {
+      "key": "orderId",
+      "value": "DEMO-POSTMAN-001"
+    },
+    {
+      "key": "quoteId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1 Place order",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.variables.set('requestTime', new Date().toISOString());",
+              "pm.variables.set('eventId', pm.variables.replaceIn('{{$guid}}'));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const r=pm.response.json(); if(r.order?.quote_id) pm.collectionVariables.set('quoteId',r.order.quote_id);",
+              "pm.test('No server failure',()=>pm.expect(pm.response.code).to.be.below(500));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"event_type\": \"order_placed\",\n  \"customer_address\": \"1200 E Campbell Rd, Richardson, TX\",\n  \"restaurant_id\": \"REST-001\",\n  \"order_timestamp\": \"{{requestTime}}\",\n  \"allow_shared\": true,\n  \"scenario\": \"normal\",\n  \"event_id\": \"{{eventId}}\",\n  \"order_id\": \"{{orderId}}\"\n}"
+        },
+        "url": "{{baseUrl}}"
+      }
+    },
+    {
+      "name": "2 Confirm option",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.variables.set('requestTime', new Date().toISOString());",
+              "pm.variables.set('eventId', pm.variables.replaceIn('{{$guid}}'));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const r=pm.response.json(); if(r.order?.quote_id) pm.collectionVariables.set('quoteId',r.order.quote_id);",
+              "pm.test('No server failure',()=>pm.expect(pm.response.code).to.be.below(500));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"event_type\": \"customer_confirmed\",\n  \"quote_id\": \"{{quoteId}}\",\n  \"option\": \"standard\",\n  \"event_timestamp\": \"{{requestTime}}\",\n  \"event_id\": \"{{eventId}}\",\n  \"order_id\": \"{{orderId}}\"\n}"
+        },
+        "url": "{{baseUrl}}"
+      }
+    },
+    {
+      "name": "3 Restaurant accepts",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.variables.set('requestTime', new Date().toISOString());",
+              "pm.variables.set('eventId', pm.variables.replaceIn('{{$guid}}'));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const r=pm.response.json(); if(r.order?.quote_id) pm.collectionVariables.set('quoteId',r.order.quote_id);",
+              "pm.test('No server failure',()=>pm.expect(pm.response.code).to.be.below(500));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"event_type\": \"restaurant_accepted\",\n  \"restaurant_id\": \"REST-001\",\n  \"event_timestamp\": \"{{requestTime}}\",\n  \"event_id\": \"{{eventId}}\",\n  \"order_id\": \"{{orderId}}\"\n}"
+        },
+        "url": "{{baseUrl}}"
+      }
+    },
+    {
+      "name": "4 Driver accepts",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.variables.set('requestTime', new Date().toISOString());",
+              "pm.variables.set('eventId', pm.variables.replaceIn('{{$guid}}'));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const r=pm.response.json(); if(r.order?.quote_id) pm.collectionVariables.set('quoteId',r.order.quote_id);",
+              "pm.test('No server failure',()=>pm.expect(pm.response.code).to.be.below(500));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"event_type\": \"driver_accepted\",\n  \"driver_id\": \"DRIVER-DEMO-001\",\n  \"event_timestamp\": \"{{requestTime}}\",\n  \"event_id\": \"{{eventId}}\",\n  \"order_id\": \"{{orderId}}\"\n}"
+        },
+        "url": "{{baseUrl}}"
+      }
+    },
+    {
+      "name": "5 Driver picks up",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.variables.set('requestTime', new Date().toISOString());",
+              "pm.variables.set('eventId', pm.variables.replaceIn('{{$guid}}'));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const r=pm.response.json(); if(r.order?.quote_id) pm.collectionVariables.set('quoteId',r.order.quote_id);",
+              "pm.test('No server failure',()=>pm.expect(pm.response.code).to.be.below(500));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"event_type\": \"driver_picked_up\",\n  \"driver_id\": \"DRIVER-DEMO-001\",\n  \"event_timestamp\": \"{{requestTime}}\",\n  \"event_id\": \"{{eventId}}\",\n  \"order_id\": \"{{orderId}}\"\n}"
+        },
+        "url": "{{baseUrl}}"
+      }
+    },
+    {
+      "name": "6 Update location",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.variables.set('requestTime', new Date().toISOString());",
+              "pm.variables.set('eventId', pm.variables.replaceIn('{{$guid}}'));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const r=pm.response.json(); if(r.order?.quote_id) pm.collectionVariables.set('quoteId',r.order.quote_id);",
+              "pm.test('No server failure',()=>pm.expect(pm.response.code).to.be.below(500));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"event_type\": \"delivery_update\",\n  \"driver_id\": \"DRIVER-DEMO-001\",\n  \"driver_location\": {\n    \"lat\": 32.98,\n    \"lng\": -96.73\n  },\n  \"event_timestamp\": \"{{requestTime}}\",\n  \"event_id\": \"{{eventId}}\",\n  \"order_id\": \"{{orderId}}\"\n}"
+        },
+        "url": "{{baseUrl}}"
+      }
+    },
+    {
+      "name": "7 Mark delivered",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.variables.set('requestTime', new Date().toISOString());",
+              "pm.variables.set('eventId', pm.variables.replaceIn('{{$guid}}'));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const r=pm.response.json(); if(r.order?.quote_id) pm.collectionVariables.set('quoteId',r.order.quote_id);",
+              "pm.test('No server failure',()=>pm.expect(pm.response.code).to.be.below(500));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"event_type\": \"delivered\",\n  \"driver_id\": \"DRIVER-DEMO-001\",\n  \"delivery_proof\": \"demo-handoff-reference\",\n  \"event_timestamp\": \"{{requestTime}}\",\n  \"event_id\": \"{{eventId}}\",\n  \"order_id\": \"{{orderId}}\"\n}"
+        },
+        "url": "{{baseUrl}}"
+      }
+    }
+  ]
+}
