@@ -4,15 +4,18 @@ This is the updated implementation for all eight sheets of your spec pack. It ru
 
 ## Open It
 
-1. Double-click `START.command`. Keep the Terminal window open while using the demo. It opens [Food Delivery Control](http://localhost:8787).
-2. Open [Food Delivery v2 in n8n](http://localhost:5678/workflow/foodDeliverySpecV2). The workflow and error logger are imported by this task when local import succeeds.
-3. Click **Publish** if the workflow is not already published. Production calls and both schedules need the workflow published.
-4. In Food Delivery Control, use **Request**, then **New order**, then **Send POST**. The default target is n8n production.
-5. The response offers the next event. Click **Confirm standard**, then **Send POST**; continue with restaurant acceptance, driver acceptance, pickup, route update and delivery. The UI prepares fresh event IDs and timestamps for each new event.
+1. Start your existing local n8n at [http://localhost:5678](http://localhost:5678). Import `food-delivery-v2-errors.n8n.json` and `food-delivery-v2.n8n.json` there if they are not already present, then publish both workflows.
+2. Double-click `START.command`. It starts only this project's SQLite support service and opens [Food Delivery Control](http://localhost:8787).
+3. In Food Delivery Control, use **Try a delivery**, then **New order**, then **Send this event**. The default target is your n8n production webhook.
+4. The response offers the next event. Click **Confirm standard**, then **Send this event**; continue with restaurant acceptance, driver acceptance, pickup, route update and delivery. The UI prepares fresh event IDs and timestamps for each new event.
+
+The n8n editor is at [Food Delivery v2 in your n8n](http://localhost:5678/workflow/foodDeliverySpecV2). `START.command` never creates, imports into, publishes, or starts an n8n instance. It only manages the support service. Its log and PID are in `data/service.log` and `data/service.pid`.
 
 Importing on another n8n instance: import `food-delivery-v2-errors.n8n.json` first, then `food-delivery-v2.n8n.json`. In workflow settings, select **Food Delivery v2 - Workflow Error Log** as the error workflow if IDs changed. For CLI import, `IMPORT-ALL.n8n.json` contains both workflows. The original three-node workflow is not the v2 workflow.
 
 ## Exact POST URLs
+
+**Open the dashboard at [http://localhost:8787](http://localhost:8787).** The URLs below are API endpoints for POST requests. Pasting one into a browser address bar sends GET and shows an n8n 404 instead of the dashboard.
 
 Production, after publishing:
 
@@ -95,7 +98,7 @@ Real notifications require an authenticated, idempotent customer/driver/support 
 
 ## Recovery
 
-`START.command` starts the support service and opens its control page. The current installed Homebrew n8n can reach `127.0.0.1:8787`; Docker/cloud n8n cannot use that address to reach your Mac without different networking. n8n must remain running for its schedules and webhook.
+`START.command` starts the support service and opens the control page. Your existing local n8n can reach `127.0.0.1:8787`; Docker/cloud n8n cannot use that address to reach your Mac without different networking. Keep your n8n instance running for its schedules and webhook.
 
 Nightly verified SQL backups are placed in `backups/`. To make one manually, run `python3 backup.py`. To restore safely, stop the support service, choose a backup, then start `python3 service.py --db /absolute/path/to/the/restored-copy.sqlite3`. Restore to a separate file; keep the original. Backups on the same machine are not complete disaster recovery.
 

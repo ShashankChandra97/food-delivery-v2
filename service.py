@@ -704,6 +704,15 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, (ROOT/'lucide.min.js').read_bytes(), 'text/javascript; charset=utf-8')
         if path == '/health':
             return self.reply(200, {'status': 'ok', 'mode': self.store.config['mode']})
+        if path == '/api/status':
+            url = self.store.config['n8n_base_url'].rstrip('/') + '/healthz'
+            try:
+                with urllib.request.urlopen(url, timeout=2) as response:
+                    n8n_ready = response.status == 200
+            except (urllib.error.URLError, TimeoutError):
+                n8n_ready = False
+            return self.reply(200, {'service': 'ready', 'n8n': 'ready' if n8n_ready else 'unavailable',
+                                    'mode': self.store.config['mode']})
         if path == '/api/snapshot':
             return self.reply(200, self.store.snapshot())
         if path == '/api/example':
