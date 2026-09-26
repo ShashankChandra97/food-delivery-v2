@@ -2,6 +2,12 @@
 
 This is the updated implementation for all eight sheets of your spec pack. It runs a local demo with actual SQL storage and a browser control page. It uses your installed n8n at port 5678 plus a small local support service at port 8787. The original workflow is preserved.
 
+## Vercel dashboard
+
+Deploy this repository from its root with Vercel's **Other** framework preset. The build copies the exact `dashboard.html` used locally to `public/index.html`, so the Vercel root shows the same interface. When you open the hosted page on the computer running this project, it calls the support service on `127.0.0.1:8787`, which uses your existing n8n at `localhost:5678` and local SQLite data. Start n8n and run `START.command` before using the hosted controls.
+
+The page loads for everyone, but visitors on other computers cannot reach services on your computer through `localhost`. They see a connection message and cannot view your local orders or run the workflow. To make the complete dashboard work for everyone, the support service, database and n8n must be reachable from the internet; this repository does not set up a second n8n instance.
+
 ## Open It
 
 1. Start your existing local n8n at [http://localhost:5678](http://localhost:5678). Import `food-delivery-v2-errors.n8n.json` and `food-delivery-v2.n8n.json` there if they are not already present, then publish both workflows.

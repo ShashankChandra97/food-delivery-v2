@@ -680,6 +680,10 @@ class Handler(BaseHTTPRequestHandler):
     store = None
     rate_lock = threading.Lock()
     requests = []
+    hosted_origins = {
+        'https://food-delivery-v2-teal.vercel.app',
+        'https://food-delivery-v2-d8vr3w6w7-shashank-86e0.vercel.app',
+    }
 
     def log_message(self, *_):
         pass
@@ -691,8 +695,24 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Content-Length', str(len(raw)))
         self.send_header('Cache-Control', 'no-store')
         self.send_header('X-Content-Type-Options', 'nosniff')
+        origin = self.headers.get('Origin')
+        if origin in self.hosted_origins:
+            self.send_header('Access-Control-Allow-Origin', origin)
+            self.send_header('Vary', 'Origin')
         self.end_headers()
         self.wfile.write(raw)
+
+    def do_OPTIONS(self):
+        origin = self.headers.get('Origin')
+        if origin not in self.hosted_origins or self.headers.get('Host') not in {f'localhost:{self.server.server_port}', f'127.0.0.1:{self.server.server_port}'}:
+            return self.reply(403, {'error': 'Origin not allowed'})
+        self.send_response(204)
+        self.send_header('Access-Control-Allow-Origin', origin)
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header('Access-Control-Allow-Private-Network', 'true')
+        self.send_header('Vary', 'Origin')
+        self.end_headers()
 
     def do_GET(self):
         if self.headers.get('Host') not in {f'localhost:{self.server.server_port}', f'127.0.0.1:{self.server.server_port}'}:
@@ -730,7 +750,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(403, {'error': 'Local host required'})
         origin = self.headers.get('Origin')
         allowed = {f'http://localhost:{self.server.server_port}', f'http://127.0.0.1:{self.server.server_port}'}
-        if origin and origin not in allowed:
+        if origin and origin not in allowed | self.hosted_origins:
             return self.reply(403, {'error': 'Cross-origin requests are not allowed'})
         if not self.headers.get('Content-Type', '').startswith('application/json'):
             return self.reply(415, {'error': 'Use Content-Type: application/json'})
